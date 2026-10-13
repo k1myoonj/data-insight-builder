@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Data Insight Builder</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- 헤더 -->
+    <header class="app-header">
+      <div class="header-left">
+        <h1>📊 AI Data Insight Builder</h1>
+        <p class="subtitle">공식 통계 CSV를 Pandas로 정확하게 계산하고, Gemini로 올바르게 해석하는 교육용 분석 웹앱</p>
+      </div>
+      <div class="header-right">
+        <div id="healthBadge" class="status-badge checking">
+          <span class="dot"></span>
+          <span id="healthText">서버 상태 확인 중...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 메모리 보관 안내 배너 -->
+    <div class="notice-banner">
+      <span class="notice-icon">💡</span>
+      <span class="notice-text">
+        <strong>안전한 메모리 보관:</strong> 업로드하신 CSV는 서버 디스크에 저장되지 않고 <strong>메모리에만 1개 데이터셋으로 임시 보관</strong>되며, 서버를 재시작하면 자동으로 삭제됩니다.
+      </span>
+    </div>
+
+    <!-- 오류 알림 배너 -->
+    <div id="errorBanner" class="error-banner hidden">
+      <span class="error-icon">⚠️</span>
+      <span id="errorMessage" class="error-text"></span>
+      <button id="closeErrorBtn" class="close-btn" aria-label="닫기">×</button>
+    </div>
+
+    <!-- 1단계: CSV 파일 업로드 섹션 -->
+    <section class="card upload-card" id="uploadSection">
+      <div class="card-header">
+        <h2>1. CSV 파일 업로드 및 자동 진단</h2>
+        <span class="step-badge">Step 1</span>
+      </div>
+      <div class="card-body">
+        <div id="dropZone" class="drop-zone">
+          <input type="file" id="fileInput" accept=".csv" class="file-input">
+          <div class="drop-zone-content">
+            <div class="upload-icon">📁</div>
+            <p class="drop-prompt"><strong>CSV 파일을 마우스로 끌어다 놓거나</strong> 클릭하여 선택하세요.</p>
+            <p class="drop-subtext">지원 인코딩: UTF-8, CP949, EUC-KR | 최대 용량: 10MB</p>
+          </div>
+        </div>
+
+        <div id="selectedFileInfo" class="selected-file-info hidden">
+          <div class="file-meta">
+            <span class="file-name" id="selectedFileName"></span>
+            <span class="file-size" id="selectedFileSize"></span>
+          </div>
+          <button id="inspectBtn" class="btn btn-primary">
+            <span class="btn-text">데이터 진단 시작하기</span>
+            <span class="spinner hidden" id="inspectSpinner"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2단계: 진단 결과 섹션 -->
+    <section class="card inspect-card hidden" id="inspectSection">
+      <div class="card-header">
+        <h2>2. 데이터 품질 및 구조 진단 결과</h2>
+        <span class="step-badge">Step 2</span>
+      </div>
+      <div class="card-body">
+        <!-- 요약 스탯 카드 그리드 -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">행 / 열 크기</span>
+            <span class="stat-value" id="statDimensions">-</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">감지된 인코딩</span>
+            <span class="stat-value" id="statEncoding">-</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">건너뛴 헤더 메모</span>
+            <span class="stat-value" id="statSkiprows">-</span>
+          </div>
+          <div class="stat-box highlight">
+            <span class="stat-label">🎯 권장 기준연도</span>
+            <span class="stat-value" id="statRecYear">-</span>
+          </div>
+        </div>
+
+        <!-- 경고 알림 상자 -->
+        <div id="warningsBox" class="warnings-box hidden">
+          <h3>⚠️ 주의 및 품질 알림</h3>
+          <ul id="warningsList" class="warnings-list"></ul>
+        </div>
+
+        <!-- 10행 데이터 미리보기 아코디언 -->
+        <details class="preview-details" open>
+          <summary class="preview-summary">📋 데이터 미리보기 (상위 10행)</summary>
+          <div class="table-wrapper">
+            <table id="previewTable" class="data-table">
+              <thead id="previewThead"></thead>
+              <tbody id="previewTbody"></tbody>
+            </table>
+          </div>
+        </details>
+
+        <!-- 제안 요청 버튼 -->
+        <div class="action-footer">
+          <button id="suggestBtn" class="btn btn-success btn-large">
+            <span class="btn-text">🤖 Gemini에게 실행 가능한 분석 추천받기</span>
+            <span class="spinner hidden" id="suggestSpinner"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3단계: Gemini 분석 제안 섹션 -->
+    <section class="card suggest-card hidden" id="suggestSection">
+      <div class="card-header">
+        <h2>3. 추천된 분석 도구 선택</h2>
+        <span class="step-badge">Step 3</span>
+      </div>
+      <div class="card-body">
+        <p class="section-desc">Gemini가 이 데이터의 구조와 품질을 검토하여 가장 통계적 가치가 높은 3~5개 분석을 제안했습니다. 원하는 분석의 <strong>[실행하기]</strong> 버튼을 누르세요.</p>
+        
+        <div id="suggestionsList" class="suggestions-grid">
+          <!-- JS로 동적 렌더링 -->
+        </div>
+
+        <!-- 수동 도구 선택 아코디언 -->
+        <details class="manual-tool-details">
+          <summary class="manual-tool-summary">⚙️ 원하는 도구 직접 선택해서 실행하기 (12개 카탈로그 전체)</summary>
+          <div class="manual-tool-form">
+            <div class="form-group">
+              <label for="manualToolSelect">분석 도구 선택:</label>
+              <select id="manualToolSelect" class="form-control"></select>
+            </div>
+            <div class="form-group">
+              <label for="manualRefPeriod">기준 시점 (연도):</label>
+              <input type="text" id="manualRefPeriod" class="form-control" placeholder="예: 2024">
+            </div>
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" id="manualExcludeAgg" checked> 전체 통계 왜곡 방지를 위해 집계 묶음 행 제외
+              </label>
+            </div>
+            <button id="manualRunBtn" class="btn btn-secondary">수동 실행</button>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- 4단계: Pandas 계산 결과 및 차트 섹션 -->
+    <section class="card run-card hidden" id="runSection">
+      <div class="card-header">
+        <h2>4. Pandas 실제 계산 결과 및 시각화</h2>
+        <span class="step-badge">Step 4</span>
+      </div>
+      <div class="card-body">
+        <!-- 실행 메타데이터 배너 -->
+        <div class="calc-meta-bar">
+          <div class="meta-item"><strong>실행 도구:</strong> <span id="runToolName">-</span></div>
+          <div class="meta-item"><strong>기준 시점:</strong> <span id="runRefPeriod">-</span></div>
+          <div class="meta-item"><strong>사용한 행 수:</strong> <span id="runUsedRows" class="badge badge-success">-</span></div>
+          <div class="meta-item"><strong>제외한 행 수:</strong> <span id="runExcludedRows" class="badge badge-warning">-</span></div>
+        </div>
+
+        <!-- 제외 이유 및 주의사항 박스 -->
+        <div id="runNoticeBox" class="run-notice-box">
+          <p id="runExcludedReasons" class="notice-line"></p>
+          <p id="runCaution" class="caution-line"></p>
+        </div>
+
+        <!-- Chart.js 차트 캔버스 영역 -->
+        <div id="chartContainer" class="chart-container">
+          <canvas id="analysisChart"></canvas>
+        </div>
+
+        <!-- 계산 데이터 표 요약 영역 -->
+        <div id="calcResultDisplay" class="calc-result-display"></div>
+
+        <!-- 해석 요청 버튼 바 -->
+        <div class="explain-action-bar">
+          <div class="mode-desc">
+            <p><strong>Pandas 계산이 완료되었습니다!</strong> 이제 계산된 통계 숫자만을 Gemini에게 전달하여 중학생도 이해할 수 있는 정밀 리포트를 작성합니다.</p>
+          </div>
+          <div class="btn-group">
+            <button id="explainModeBBtn" class="btn btn-primary btn-large">
+              <span>📝 정식 보고서 생성 (모드 B: 엄격한 해석)</span>
+              <span class="spinner hidden" id="explainSpinnerB"></span>
+            </button>
+            <button id="explainModeABtn" class="btn btn-outline">
+              <span>⚠️ 비교용 허술한 보고서 (모드 A: 계산 없는 AI 상상)</span>
+              <span class="spinner hidden" id="explainSpinnerA"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5단계: Gemini 해석 리포트 섹션 -->
+    <section class="card explain-card hidden" id="explainSection">
+      <div class="card-header">
+        <h2 id="explainTitle">5. AI 데이터 인사이트 리포트</h2>
+        <span class="step-badge" id="explainModeBadge">Mode B</span>
+      </div>
+      <div class="card-body">
+        <div id="modeComparisonNotice" class="mode-notice hidden"></div>
+        <div id="reportMarkdownContainer" class="markdown-container">
+          <!-- 마크다운 보고서 렌더링 영역 -->
+        </div>
+
+        <!-- 6단계 / 후속 질문 대화창 영역 -->
+        <hr class="section-divider">
+        <div class="followup-chat-section" id="chatSection">
+          <div class="chat-header">
+            <h3>💬 보고서 결과에 대해 후속 질문하기</h3>
+            <p class="chat-subdesc">보고서 내용이나 통계 수치에 대해 더 궁금한 점을 물어보세요. 아래 추천 말풍선을 클릭하면 바로 질문할 수 있습니다.</p>
+          </div>
+
+          <!-- 추천 질문 말풍선 칩 (Chip) 목록 -->
+          <div class="prompt-chips-container" id="promptChipsContainer">
+            <span class="chips-label">💡 추천 질문:</span>
+            <button type="button" class="chip-btn highlight-chip" data-question="중학생도 이해할 수 있게 쉽게 설명해줘">
+              🧒 "중학생도 이해할 수 있게 쉽게 설명해줘"
+            </button>
+            <button type="button" class="chip-btn" data-question="이 결과에서 주의해야 할 통계적 한계나 왜곡(착시)은 뭐야?">
+              ⚠️ "통계적 한계나 왜곡은 뭐야?"
+            </button>
+            <button type="button" class="chip-btn" data-question="이 결과를 바탕으로 다음에 어떤 분석 도구를 이어서 사용하면 좋을까?">
+              🔍 "다음에 어떤 도구로 이어서 분석할까?"
+            </button>
+            <button type="button" class="chip-btn" data-question="가장 수치가 높거나 낮은 핵심 항목의 주요 특징을 요약해줘">
+              📊 "최고/최저 핵심 항목 특징 요약해줘"
+            </button>
+          </div>
+
+          <!-- 대화 말풍선 메시지 목록 -->
+          <div class="chat-messages-box" id="chatMessagesBox">
+            <div class="chat-message bot-msg intro-msg">
+              <div class="msg-avatar">🤖</div>
+              <div class="msg-bubble">
+                <p>안녕하세요! 방금 생성된 분석 보고서에 대해 무엇이든 물어보세요. 위의 추천 말풍선 칩을 클릭하거나 아래에 직접 질문을 입력하시면 친절히 설명해 드립니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 질문 입력 바 -->
+          <form id="chatForm" class="chat-input-form" onsubmit="return false;">
+            <input type="text" id="chatInput" class="chat-input" placeholder="보고서에 대해 궁금한 점을 입력하세요 (예: 중학생도 이해할 수 있게 쉽게 설명해줘)" autocomplete="off">
+            <button type="submit" id="sendChatBtn" class="btn btn-primary btn-chat">
+              <span class="btn-text">질문 전송</span>
+              <span class="spinner hidden" id="chatSpinner"></span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="app-footer">
+    <p>AI Data Insight Builder &bull; Built with Python Flask, Pandas, Vanilla JS, Chart.js &amp; Google Gemini API</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
