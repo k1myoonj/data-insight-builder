@@ -233,34 +233,37 @@
     startInspect();
   }
 
-  // 드롭존 이벤트
-  dropZone.addEventListener('click', (e) => {
-    if (e.target !== fileInput) {
-      fileInput.click();
-    }
-  });
+  // 브라우저 기본 드래그 앤 드롭 파일 열기 방지
+  window.addEventListener('dragover', (e) => e.preventDefault(), false);
+  window.addEventListener('drop', (e) => e.preventDefault(), false);
 
+  // 드롭존 시각 효과 및 파일 수신 이벤트
   ['dragenter', 'dragover'].forEach(eventName => {
     dropZone.addEventListener(eventName, (e) => {
       e.preventDefault();
+      e.stopPropagation();
       dropZone.classList.add('dragover');
     });
   });
 
-  ['dragleave', 'drop'].forEach(eventName => {
+  ['dragleave', 'dragend'].forEach(eventName => {
     dropZone.addEventListener(eventName, (e) => {
       e.preventDefault();
+      e.stopPropagation();
       dropZone.classList.remove('dragover');
     });
   });
 
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    e.stopPropagation();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileSelect(e.dataTransfer.files[0]);
     }
   });
 
+  // input[type=file] 변경 이벤트 (label 클릭 시 브라우저가 자동 트리거)
   fileInput.addEventListener('change', (e) => {
     if (e.target.files && e.target.files.length > 0) {
       handleFileSelect(e.target.files[0]);

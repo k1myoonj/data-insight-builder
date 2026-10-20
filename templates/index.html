@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Data Insight Builder</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=20261020_02">
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -46,14 +46,17 @@
         <span class="step-badge">Step 1</span>
       </div>
       <div class="card-body">
-        <div id="dropZone" class="drop-zone">
-          <input type="file" id="fileInput" accept=".csv" class="file-input">
+        <label for="fileInput" id="dropZone" class="drop-zone">
+          <input type="file" id="fileInput" accept=".csv,text/csv" class="file-input-hidden">
           <div class="drop-zone-content">
             <div class="upload-icon">📁</div>
             <p class="drop-prompt"><strong>CSV 파일을 마우스로 끌어다 놓거나</strong> 클릭하여 선택하세요.</p>
+            <div class="drop-btn-wrapper">
+              <span class="btn btn-primary btn-select-file">📂 내 컴퓨터에서 CSV 파일 찾아보기</span>
+            </div>
             <p class="drop-subtext">지원 인코딩: UTF-8, CP949, EUC-KR | 최대 용량: 10MB</p>
           </div>
-        </div>
+        </label>
 
         <div id="selectedFileInfo" class="selected-file-info hidden">
           <div class="file-meta">
@@ -325,6 +328,6 @@
     <p>AI Data Insight Builder &bull; Built with Python Flask, Pandas, Vanilla JS, Chart.js &amp; Google Gemini API</p>
   </footer>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20261020_02"></script>
 </body>
 </html>

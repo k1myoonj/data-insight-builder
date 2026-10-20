@@ -293,45 +293,55 @@ body {
    Step 1: 업로드 드롭존
    -------------------------------------------------------------------------- */
 .drop-zone {
+  display: block;
   position: relative;
-  border: 2px dashed #cbd5e1;
+  border: 2px dashed #94a3b8;
   border-radius: var(--radius-md);
-  padding: 44px 24px;
+  padding: 40px 24px;
   text-align: center;
   background-color: #f8fafc;
   cursor: pointer;
   transition: all 0.2s ease;
+  user-select: none;
 }
 
 .drop-zone:hover, .drop-zone.dragover {
   border-color: var(--primary-color);
   background-color: #eff6ff;
+  border-style: solid;
 }
 
-.file-input {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 10;
+.file-input-hidden {
+  display: none !important;
 }
 
 .drop-zone-content {
-  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .upload-icon {
-  font-size: 2.8rem;
+  font-size: 3rem;
   margin-bottom: 8px;
 }
 
 .drop-prompt {
   font-size: 1.05rem;
   color: var(--text-main);
-  margin-bottom: 6px;
+  margin-bottom: 12px;
+}
+
+.drop-btn-wrapper {
+  margin-bottom: 12px;
+}
+
+.btn-select-file {
+  display: inline-block;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  pointer-events: none; /* 라벨 클릭이 바로 통과되도록 */
 }
 
 .drop-subtext {

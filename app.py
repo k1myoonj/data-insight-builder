@@ -28,6 +28,14 @@ app = Flask(__name__)
 # 업로드 최대 용량 설정 (MB 단위)
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", 10))
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_MB * 1024 * 1024
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # 메모리 기반 데이터셋 보관소 (디스크 영구 저장 금지, 1개 데이터셋만 보관)
 CURRENT_DATASET = {
