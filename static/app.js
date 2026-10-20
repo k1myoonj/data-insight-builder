@@ -501,6 +501,9 @@
       }
 
       displayRunResult(data);
+    } catch (err) {
+      showError(err.message);
+    }
   }
 
   function renderChart(chartData) {
