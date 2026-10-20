@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 – AI Data Insight Builder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    .card {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 20px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.1);
+      text-align: center;
+    }
+
+    .logo-icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+
+    .subtitle {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-align: left;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 14px 18px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1.5px solid rgba(99, 102, 241, 0.4);
+      border-radius: 12px;
+      color: #f1f5f9;
+      font-size: 1.5rem;
+      letter-spacing: 0.4em;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      margin-bottom: 6px;
+    }
+
+    input[type="password"]::placeholder {
+      letter-spacing: 0.2em;
+      font-size: 1rem;
+      color: #475569;
+    }
+
+    input[type="password"]:focus {
+      border-color: rgba(99, 102, 241, 0.8);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 24px;
+      text-align: right;
+    }
+
+    .error-msg {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 0.83rem;
+      padding: 10px 14px;
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.3px;
+    }
+
+    button[type="submit"]:hover  { opacity: 0.9; }
+    button[type="submit"]:active { transform: scale(0.98); }
+
+    .footer {
+      margin-top: 28px;
+      font-size: 0.75rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="logo-icon">🔐</span>
+    <h1>AI Data Insight Builder</h1>
+    <p class="subtitle">계속하려면 4자리 비밀번호를 입력하세요.</p>
+
+    {% if error %}
+    <div class="error-msg">⚠️ {{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/login">
+      <label for="password">비밀번호</label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        maxlength="4"
+        inputmode="numeric"
+        placeholder="••••"
+        autocomplete="current-password"
+        autofocus
+      />
+      <p class="hint">4자리 숫자</p>
+      <button type="submit">입장하기</button>
+    </form>
+
+    <p class="footer">허가된 사용자만 이용할 수 있습니다.</p>
+  </div>
+</body>
+</html>

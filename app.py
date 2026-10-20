@@ -6,7 +6,7 @@ import json
 import logging
 import math
 import pandas as pd
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -29,6 +29,49 @@ app = Flask(__name__)
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", 10))
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_MB * 1024 * 1024
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+# ── 인증 설정 ──────────────────────────────────────────────
+app.secret_key = os.getenv("SECRET_KEY", "data-insight-builder-secret-2024")
+APP_PASSWORD   = os.getenv("APP_PASSWORD", "9990")
+
+# 인증이 필요 없는 엔드포인트 목록
+_PUBLIC_ENDPOINTS = {"login", "logout", "health", "static"}
+
+@app.before_request
+def require_login():
+    """인증되지 않은 요청은 로그인 페이지로 리다이렉트"""
+    if request.endpoint in _PUBLIC_ENDPOINTS:
+        return  # 공개 엔드포인트는 통과
+    if not session.get("authenticated"):
+        # API 요청(JSON)이면 401, 일반 페이지 요청이면 리다이렉트
+        if request.is_json or request.path.startswith("/api"):
+            return jsonify({"error": "로그인이 필요합니다."}), 401
+        return redirect(url_for("login"))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """로그인 페이지 – GET: 폼 표시, POST: 비밀번호 검증"""
+    error = None
+    if request.method == "POST":
+        pw = request.form.get("password", "").strip()
+        if pw == APP_PASSWORD:
+            session["authenticated"] = True
+            logger.info("[AUTH] 로그인 성공")
+            return redirect(url_for("index"))
+        else:
+            error = "비밀번호가 올바르지 않습니다."
+            logger.warning("[AUTH] 비밀번호 오류")
+    return render_template("login.html", error=error)
+
+@app.route("/logout")
+def logout():
+    """세션 초기화 후 로그인 페이지로 이동"""
+    session.clear()
+    logger.info("[AUTH] 로그아웃")
+    return redirect(url_for("login"))
+# ─────────────────────────────────────────────────────────
+
+
 
 @app.after_request
 def add_no_cache_headers(response):
