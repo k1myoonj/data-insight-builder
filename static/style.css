@@ -929,6 +929,111 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   자연어 질문 섹션 (Step 2-1)
+   -------------------------------------------------------------------------- */
+.nl-card {
+  border-left: 4px solid #2563eb;
+  background: #ffffff;
+}
+
+.nl-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: var(--radius-sm);
+}
+
+.nl-input-form {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.nl-input {
+  flex: 1;
+  padding: 14px 18px;
+  font-size: 1rem;
+  border: 2px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: #ffffff;
+  transition: all 0.2s ease-in-out;
+}
+
+.nl-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+.btn-nl {
+  padding: 0 28px;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.nl-answer-box {
+  margin-top: 24px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.nl-answer-header h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nl-viz-action-bar {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.nl-viz-action-bar .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  padding: 14px 26px;
+  font-size: 1.05rem;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
+}
+
+.nl-viz-action-bar .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+}
+
+.btn-arrow {
+  transition: transform 0.2s ease;
+}
+
+.nl-viz-action-bar .btn:hover .btn-arrow {
+  transform: translateX(4px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --------------------------------------------------------------------------
    푸터
    -------------------------------------------------------------------------- */
 .app-footer {

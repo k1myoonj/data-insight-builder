@@ -112,12 +112,67 @@
           </div>
         </details>
 
-        <!-- 제안 요청 버튼 -->
+        <!-- 제안 요청 및 자연어 질문 이동 버튼 바 -->
         <div class="action-footer">
-          <button id="suggestBtn" class="btn btn-success btn-large">
-            <span class="btn-text">🤖 Gemini에게 실행 가능한 분석 추천받기</span>
+          <button id="suggestBtn" class="btn btn-outline btn-large">
+            <span class="btn-text">🤖 Gemini 추천 분석 카탈로그 보기</span>
             <span class="spinner hidden" id="suggestSpinner"></span>
           </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2-1단계: 자연어 자유 질문 섹션 (AI 분석 추천 전 사용) -->
+    <section class="card nl-card hidden" id="nlQuestionSection">
+      <div class="card-header">
+        <h2>💬 원하는 질문으로 데이터 직접 분석하기</h2>
+        <span class="step-badge">자연어 탐색</span>
+      </div>
+      <div class="card-body">
+        <p class="section-desc">
+          궁금한 내용을 일상 언어로 질문해 보세요. Pandas가 실제 데이터를 정확히 계산한 통계 사실을 바탕으로 답변하며, 바로 시각화 차트로 연결할 수 있습니다.
+        </p>
+
+        <!-- 추천 질문 칩 (클릭 시 자동 입력 및 전송) -->
+        <div class="nl-chips-container" id="nlChipsContainer">
+          <span class="chips-label">💡 추천 질문 예시:</span>
+          <button type="button" class="chip-btn highlight-chip" data-question="2024년 기준 인터넷 이용률 상위 10개 국가와 한국의 위치를 알려줘">
+            🏆 "2024년 상위 10개국과 한국 위치 알려줘"
+          </button>
+          <button type="button" class="chip-btn" data-question="2024년 한국과 미국, 일본, 독일의 연도별 이용률 추이를 비교해줘">
+            📈 "한국 vs 주요국 연도별 추이 비교"
+          </button>
+          <button type="button" class="chip-btn" data-question="2024년 대한민국과 전체 국가의 평균 및 중앙값을 비교해줘">
+            🎯 "한국 vs 세계 평균/중앙값 비교"
+          </button>
+          <button type="button" class="chip-btn" data-question="2024년 전 세계 국가들의 인터넷 이용률 분포 요약해줘">
+            📊 "2024년 전 세계 분포 요약"
+          </button>
+        </div>
+
+        <!-- 질문 입력 폼 -->
+        <form id="nlQuestionForm" class="nl-input-form" onsubmit="return false;">
+          <input type="text" id="nlInput" class="nl-input" placeholder="예: 2024년 기준 인터넷 이용률 상위 10개 국가와 한국의 위치를 알려줘" autocomplete="off">
+          <button type="submit" id="nlSubmitBtn" class="btn btn-primary btn-large btn-nl">
+            <span class="btn-text">데이터 분석 질문</span>
+            <span class="spinner hidden" id="nlSpinner"></span>
+          </button>
+        </form>
+
+        <!-- 자연어 답변 결과 상자 (질문 답변 시 표시) -->
+        <div id="nlAnswerBox" class="nl-answer-box hidden">
+          <div class="nl-answer-header">
+            <h4>🤖 데이터 기반 분석 답변</h4>
+          </div>
+          <div id="nlAnswerMarkdown" class="markdown-container"></div>
+
+          <!-- 시각화 차트로 즉시 연결하는 버튼 -->
+          <div class="nl-viz-action-bar">
+            <button id="nlGoToVizBtn" class="btn btn-success btn-large">
+              <span>📊 이 질문에 대한 시각화 차트 및 심층 분석 보기</span>
+              <span class="btn-arrow">➔</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>

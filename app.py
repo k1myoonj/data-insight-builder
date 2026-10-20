@@ -523,6 +523,192 @@ def suggest():
         "suggestions": validated_suggestions
     }), 200
 
+@app.route("/ask", methods=["POST"])
+def ask_question():
+    """자연어 질문을 받아 도구 매핑 및 Pandas 계산을 수행하고, 데이터에 근거한 답변과 시각화 결과를 반환"""
+    logger.info("[REQUEST] POST /ask")
+
+    if CURRENT_DATASET["df"] is None:
+        logger.warning("[ERROR] 데이터셋 미업로드 상태에서 /ask 요청")
+        return jsonify({"error": "먼저 CSV 파일을 업로드해 주세요."}), 400
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+    if not api_key or api_key == "your_gemini_api_key_here":
+        return jsonify({"error": "Gemini API Key가 설정되지 않았습니다. .env 파일에 유효한 API Key를 입력해 주세요."}), 400
+
+    data = request.get_json(silent=True) or {}
+    user_question = data.get("question", "").strip()
+    if not user_question:
+        return jsonify({"error": "질문 내용을 입력해 주세요."}), 400
+
+    df = CURRENT_DATASET["df"]
+    inspect_res = CURRENT_DATASET["inspect_result"] or {}
+    tool_catalog = tools.get_tool_catalog()
+    allowed_tool_names = {t["name"] for t in tool_catalog}
+
+    client = genai.Client(api_key=api_key)
+    year_columns = inspect_res.get("column_categories", {}).get("year_columns", [])
+    rec_year = inspect_res.get("recommended_reference_year", "")
+    id_col = inspect_res.get("column_categories", {}).get("identifier_column", "")
+    sample_items = [str(x) for x in df[id_col].dropna().head(10).tolist()] if id_col and id_col in df.columns else []
+
+    # 1단계: 사용자 자연어 질문 의도 파악 및 도구/파라미터 추출
+    intent_prompt = f"""당신은 데이터 분석 시스템의 쿼리 라우터입니다.
+사용자가 업로드된 데이터셋에 대해 다음과 같은 자연어 질문을 하였습니다.
+
+[사용자 질문]:
+"{user_question}"
+
+[데이터셋 메타정보]:
+- 가용 연도 열 목록: {year_columns[-15:] if len(year_columns) > 15 else year_columns}
+- 추천 기준연도: {rec_year}
+- 주요 식별자(국가/항목) 열: {id_col}
+- 일부 항목 예시: {sample_items}
+
+[사용 가능한 분석 도구 카탈로그]:
+1. top_bottom_n: 기준 시점(reference_period) 상위·하위 N개 순위 비교 (params: reference_period, n, exclude_aggregates=True)
+2. compare_one_vs_all: 특정 대상(target_item)과 전체 평균/중앙값 및 순위 비교 (params: reference_period, target_item, exclude_aggregates=True)
+3. trend_line: 주요 항목들의 연도별 시계열 추이 비교 (params: items, exclude_aggregates=False)
+4. group_summary: 범주별 그룹 평균/중앙값 요약 (params: reference_period, group_column, exclude_aggregates=True)
+5. distribution: 특정 연도의 전체 분포 및 히스토그램 (params: reference_period, bins=10, exclude_aggregates=True)
+6. change_rate: 두 시점 간 증감율/성장률 비교 (params: reference_period, base_period, n=10, exclude_aggregates=True)
+7. describe_numeric: 특정 수치 열 기술통계 (params: column)
+
+[규칙]:
+1. 질문의 의도에 가장 적합한 도구 1개를 선택하세요.
+   - 예: "2024년 상위 10개국과 한국 위치" -> tool: "top_bottom_n", params: {{"reference_period": "2024", "n": 10, "exclude_aggregates": true}}, target_items: ["Korea, Rep.", "Korea", "대한민국"]
+2. 사용자가 언급한 연도가 가용 연도 열에 없으면, 가장 최근의 가용 연도(예: {rec_year})를 reference_period로 지정하세요.
+3. 반드시 아래 JSON 형식으로만 응답하세요:
+{{
+  "tool": "선택한 도구명",
+  "params": {{ ... }},
+  "target_items": ["언급된 특정 국가/항목명 (없으면 빈 배열)"],
+  "intent_summary": "질문 의도 한 줄 요약"
+}}
+"""
+    try:
+        intent_res = client.models.generate_content(
+            model=model_name,
+            contents=intent_prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.1
+            )
+        )
+        parsed_intent = json.loads(intent_res.text)
+        tool_name = parsed_intent.get("tool", "top_bottom_n")
+        params = parsed_intent.get("params", {}) or {}
+        target_items = parsed_intent.get("target_items", []) or []
+    except Exception as e:
+        logger.warning(f"[AI] 의도 파악 실패, 기본 top_bottom_n 적용: {e}")
+        tool_name = "top_bottom_n"
+        params = {"reference_period": rec_year, "n": 10, "exclude_aggregates": True}
+        target_items = ["Korea, Rep."]
+
+    if tool_name not in allowed_tool_names:
+        tool_name = "top_bottom_n"
+
+    # 연도 컬럼 안전성 검증
+    year_cols = [c for c in df.columns if str(c).strip().isdigit() and 1800 <= int(str(c).strip()) <= 2100]
+    fallback_year = rec_year if (rec_year and rec_year in df.columns) else (year_cols[-1] if year_cols else None)
+
+    ref_p = params.get("reference_period")
+    if not ref_p or str(ref_p) not in df.columns:
+        params["reference_period"] = fallback_year
+
+    # 2단계: Pandas로 엄격한 통계 계산 수행
+    tool_func = TOOL_DISPATCHER[tool_name]
+    try:
+        run_output = tool_func(df, **params)
+    except Exception as e:
+        logger.warning(f"[TOOL] 파라미터 보정 후 재시도: {e}")
+        params = {"reference_period": fallback_year, "n": 10, "exclude_aggregates": True}
+        run_output = tools.top_bottom_n(df, **params)
+        tool_name = "top_bottom_n"
+
+    # 추가 팩트: 특정 국가(예: 한국) 순위 및 수치 별도 계산 (질문에 언급되었을 경우)
+    target_stats = []
+    val_col = params.get("reference_period")
+    if val_col and val_col in df.columns:
+        filtered_df, _, _ = tools.filter_dataframe(df, exclude_aggregates=True)
+        s_num = pd.to_numeric(filtered_df[val_col], errors='coerce')
+        valid_df = filtered_df[s_num.notna()].copy()
+        valid_df["_val"] = s_num[s_num.notna()]
+        valid_df_sorted = valid_df.sort_values(by="_val", ascending=False).reset_index(drop=True)
+        total_valid_count = len(valid_df_sorted)
+
+        label_col = tools.detect_label_column(df)
+        search_targets = target_items if target_items else ["Korea, Rep.", "Korea", "대한민국"]
+        for target in search_targets:
+            matches = valid_df_sorted[valid_df_sorted[label_col].astype(str).str.lower().str.contains(target.lower())]
+            if not matches.empty:
+                for idx, row in matches.iterrows():
+                    target_stats.append({
+                        "name": str(row[label_col]),
+                        "rank": int(idx) + 1,
+                        "total_count": int(total_valid_count),
+                        "value": float(round(row["_val"], 4)),
+                        "percentile": float(round((total_valid_count - (idx + 1) + 1) / total_valid_count * 100, 2)),
+                        "reference_period": str(val_col)
+                    })
+                break
+
+    # 최근 실행 결과로 저장 (시각화 버튼 클릭 시 즉시 활용)
+    CURRENT_DATASET["last_run_result"] = run_output
+
+    # 3단계: Pandas 계산 통계 팩트만을 주입하여 자연어 답변 생성
+    indicator_meta = get_indicator_metadata()
+    answer_prompt = f"""당신은 데이터 인사이트 빌더의 전문 데이터 분석가입니다.
+사용자가 업로드된 데이터셋에 대해 자연어 질문을 하였고, 우리 시스템의 Pandas 엔진이 실제 데이터를 계산한 통계 결과가 아래에 나와 있습니다.
+
+[사용자 질문]:
+"{user_question}"
+
+[지표 정의 및 단위]:
+- 지표명: {indicator_meta['name']} ({indicator_meta['definition']})
+- 출처: {indicator_meta['source']}
+
+[Pandas 실제 계산 통계 결과]:
+- 실행된 분석 도구: {tool_name}
+- 적용된 기준 시점: {run_output.get('reference_period')}
+- 계산에 포함된 유효 데이터 수: {run_output.get('used_rows')}개국
+- 제외된 집계/결측 행 수: {run_output.get('excluded_rows')}개 ({', '.join(run_output.get('excluded_reasons', []))})
+- 도구 계산 결과 상세: {json.dumps(run_output.get('result', {}), ensure_ascii=False)}
+- 특정 언급 대상(한국 등) 별도 계산 결과: {json.dumps(target_stats, ensure_ascii=False)}
+- 도구 주의사항: {run_output.get('caution', '')}
+
+[답변 작성 절대 원칙]:
+1. 오직 위에 제공된 Pandas 실제 계산 결과의 숫자만 언급하세요. 임의로 숫자를 지어내거나 추측하지 마세요.
+2. 질문에서 한국(대한민국)의 위치를 물어보았다면, 특정 언급 대상 별도 계산 결과에 나온 실제 순위(예: 전체 N개국 중 M위, 상위 X%)와 수치를 명확하고 친절하게 알려주세요.
+3. 상위 10개국 순위와 수치를 보기 좋은 마크다운 표나 리스트로 깔끔하게 정리해 주세요.
+4. 사용자가 요청한 연도와 실제 분석 연도가 다를 경우(예: 최신 가용 연도 적용 등) 그 이유를 투명하게 밝혀주세요.
+5. 데이터로 알 수 없는 원인(왜 높은지 등)은 '이 데이터로는 확인할 수 없다'고 분명히 선을 긋고, 버뮤다/쿠웨이트 등 소국이나 특수 표본에 대한 통계적 유의점을 덧붙이세요.
+6. 답변 마지막에는 자연스럽게 아래의 시각화 버튼을 통해 인터랙티브 차트와 정식 A/B 보고서를 확인할 수 있음을 안내하세요.
+"""
+    try:
+        answer_res = client.models.generate_content(
+            model=model_name,
+            contents=answer_prompt
+        )
+        answer_markdown = answer_res.text
+        logger.info(f"[AI] ask 답변 수신 (길이: {len(answer_markdown)}자)")
+    except Exception as e:
+        logger.error(f"[ERROR] 자연어 답변 생성 오류: {e}", exc_info=True)
+        return jsonify({"error": f"답변 생성 중 오류가 발생했습니다: {str(e)}"}), 500
+
+    response_payload = {
+        "status": "success",
+        "success": True,
+        "question": user_question,
+        "answer_markdown": answer_markdown,
+        "tool": tool_name,
+        "params": params,
+        "run_result": run_output
+    }
+    logger.info("[RESPONSE] status=200")
+    return jsonify(response_payload), 200
+
 @app.route("/run", methods=["POST"])
 def run_tool():
     """선택된 분석 도구를 Pandas 엔진으로 실행, 계산 결과 및 차트 데이터 반환"""

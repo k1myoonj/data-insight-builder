@@ -87,6 +87,18 @@
   const modeComparisonNotice = document.getElementById('modeComparisonNotice');
   const reportMarkdownContainer = document.getElementById('reportMarkdownContainer');
 
+  // Step 2-1: 자연어 자유 질문
+  const nlQuestionSection = document.getElementById('nlQuestionSection');
+  const nlChipsContainer = document.getElementById('nlChipsContainer');
+  const nlQuestionForm = document.getElementById('nlQuestionForm');
+  const nlInput = document.getElementById('nlInput');
+  const nlSubmitBtn = document.getElementById('nlSubmitBtn');
+  const nlSpinner = document.getElementById('nlSpinner');
+  const nlAnswerBox = document.getElementById('nlAnswerBox');
+  const nlAnswerMarkdown = document.getElementById('nlAnswerMarkdown');
+  const nlGoToVizBtn = document.getElementById('nlGoToVizBtn');
+  let lastNLRunResult = null;
+
   // Step 6: 후속 질문 (Q&A 대화창)
   const chatSection = document.getElementById('chatSection');
   const promptChipsContainer = document.getElementById('promptChipsContainer');
@@ -210,9 +222,12 @@
 
     // 이전 분석 결과 초기화
     inspectSection.classList.add('hidden');
+    nlQuestionSection.classList.add('hidden');
+    nlAnswerBox.classList.add('hidden');
     suggestSection.classList.add('hidden');
     runSection.classList.add('hidden');
     explainSection.classList.add('hidden');
+    lastNLRunResult = null;
   }
 
   // 드롭존 이벤트
@@ -299,6 +314,7 @@
       renderPreviewTable(data.columns, data.preview);
 
       inspectSection.classList.remove('hidden');
+      nlQuestionSection.classList.remove('hidden');
       inspectSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     } catch (err) {
@@ -423,6 +439,34 @@
   // ----------------------------------------------------------------------------
   // Step 4: /run 도구 실행 및 Chart.js 렌더링
   // ----------------------------------------------------------------------------
+  function displayRunResult(data) {
+    if (!data) return;
+    currentRunData = data;
+    console.log(`[RUN] 결과 표시: 도구=${data.tool}, 사용 행=${data.used_rows}, 제외 행=${data.excluded_rows}`);
+
+    // 메타 정보 표시
+    runToolName.textContent = data.tool;
+    runRefPeriod.textContent = data.reference_period || '지정 안 됨';
+    runUsedRows.textContent = `${data.used_rows}개`;
+    runExcludedRows.textContent = `${data.excluded_rows}개`;
+
+    runExcludedReasons.textContent = data.excluded_reasons && data.excluded_reasons.length > 0
+      ? `• 제외 사유: ${data.excluded_reasons.join(' | ')}`
+      : '• 제외된 행 없음 (전체 행 사용)';
+
+    runCaution.textContent = data.caution ? `• 주의사항: ${data.caution}` : '';
+
+    // Chart.js 차트 렌더링
+    renderChart(data.chart_data);
+
+    // 계산 결과 수치 테이블/요약 렌더링
+    renderResultDisplay(data.result);
+
+    runSection.classList.remove('hidden');
+    explainSection.classList.add('hidden'); // 새로운 실행 시 이전 해석 리포트 숨김
+    runSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   async function executeTool(toolName, params) {
     hideError();
     console.log(`[RUN] 도구 실행 시작 (도구명: ${toolName}, 기준시점: ${params.reference_period || 'N/A'})`);
@@ -439,34 +483,7 @@
         throw new Error(data.error || '도구 실행 중 오류가 발생했습니다.');
       }
 
-      currentRunData = data;
-      console.log(`[RUN] 결과 수신: 사용 행 수=${data.used_rows}, 제외 행 수=${data.excluded_rows}`);
-
-      // 메타 정보 표시
-      runToolName.textContent = data.tool;
-      runRefPeriod.textContent = data.reference_period || '지정 안 됨';
-      runUsedRows.textContent = `${data.used_rows}개`;
-      runExcludedRows.textContent = `${data.excluded_rows}개`;
-
-      runExcludedReasons.textContent = data.excluded_reasons && data.excluded_reasons.length > 0
-        ? `• 제외 사유: ${data.excluded_reasons.join(' | ')}`
-        : '• 제외된 행 없음 (전체 행 사용)';
-
-      runCaution.textContent = data.caution ? `• 주의사항: ${data.caution}` : '';
-
-      // Chart.js 차트 렌더링
-      renderChart(data.chart_data);
-
-      // 계산 결과 수치 테이블/요약 렌더링
-      renderResultDisplay(data.result);
-
-      runSection.classList.remove('hidden');
-      explainSection.classList.add('hidden'); // 새로운 실행 시 이전 해석 리포트 숨김
-      runSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    } catch (err) {
-      showError(err.message);
-    }
+      displayRunResult(data);
   }
 
   function renderChart(chartData) {
@@ -694,6 +711,85 @@
     chatForm.addEventListener('submit', (e) => {
       e.preventDefault();
       handleSendChat();
+    });
+  }
+
+  // ----------------------------------------------------------------------------
+  // Step 2-1: 자연어 자유 질문 처리 로직
+  // ----------------------------------------------------------------------------
+  async function handleSendNLQuestion(questionText) {
+    const question = (questionText || nlInput.value || '').trim();
+    if (!question) {
+      showError('질문 내용을 입력해 주세요.');
+      return;
+    }
+
+    hideError();
+    console.log(`[NL_QUERY] 자연어 질문 전송: "${question}"`);
+
+    nlInput.value = question;
+    nlSubmitBtn.disabled = true;
+    nlInput.disabled = true;
+    nlSpinner.classList.remove('hidden');
+
+    try {
+      const res = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || '자연어 질문 분석 중 오류가 발생했습니다.');
+      }
+
+      console.log(`[NL_QUERY] 답변 수신 완료 (도구: ${data.tool})`);
+      nlAnswerMarkdown.innerHTML = simpleMarkdownToHtml(data.answer_markdown);
+      lastNLRunResult = data.run_result;
+
+      nlAnswerBox.classList.remove('hidden');
+      nlAnswerBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    } catch (err) {
+      console.error('[ERROR] 자연어 질문 오류:', err);
+      showError(err.message);
+    } finally {
+      nlSubmitBtn.disabled = false;
+      nlInput.disabled = false;
+      nlSpinner.classList.add('hidden');
+    }
+  }
+
+  // 추천 질문 칩 클릭
+  if (nlChipsContainer) {
+    nlChipsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.chip-btn');
+      if (!btn) return;
+      const q = btn.getAttribute('data-question');
+      if (q) {
+        handleSendNLQuestion(q);
+      }
+    });
+  }
+
+  // 질문 폼 전송
+  if (nlQuestionForm) {
+    nlQuestionForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleSendNLQuestion();
+    });
+  }
+
+  // 시각화 차트 및 심층 분석으로 이동 버튼
+  if (nlGoToVizBtn) {
+    nlGoToVizBtn.addEventListener('click', () => {
+      if (!lastNLRunResult) {
+        showError('시각화할 계산 결과가 없습니다. 다시 질문해 주세요.');
+        return;
+      }
+      console.log('[NL_QUERY] 시각화 차트 보기 클릭 -> Step 4로 연결');
+      displayRunResult(lastNLRunResult);
     });
   }
 
