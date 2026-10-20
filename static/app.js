@@ -228,9 +228,18 @@
     runSection.classList.add('hidden');
     explainSection.classList.add('hidden');
     lastNLRunResult = null;
+
+    // 파일 선택 즉시 자동으로 데이터 진단 및 내용 열기 실행!
+    startInspect();
   }
 
   // 드롭존 이벤트
+  dropZone.addEventListener('click', (e) => {
+    if (e.target !== fileInput) {
+      fileInput.click();
+    }
+  });
+
   ['dragenter', 'dragover'].forEach(eventName => {
     dropZone.addEventListener(eventName, (e) => {
       e.preventDefault();
@@ -246,6 +255,7 @@
   });
 
   dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileSelect(e.dataTransfer.files[0]);
     }
@@ -255,6 +265,8 @@
     if (e.target.files && e.target.files.length > 0) {
       handleFileSelect(e.target.files[0]);
     }
+    // 동일 파일 재선택 가능하도록 초기화
+    fileInput.value = '';
   });
 
   closeErrorBtn.addEventListener('click', hideError);
@@ -262,7 +274,7 @@
   // ----------------------------------------------------------------------------
   // Step 2: /inspect 진단 요청
   // ----------------------------------------------------------------------------
-  inspectBtn.addEventListener('click', async () => {
+  async function startInspect() {
     if (!currentFile) {
       showError('먼저 CSV 파일을 선택해 주세요.');
       return;
@@ -324,7 +336,9 @@
       inspectSpinner.classList.remove('hidden');
       inspectSpinner.classList.add('hidden');
     }
-  });
+  }
+
+  inspectBtn.addEventListener('click', startInspect);
 
   function renderPreviewTable(columns, previewRows) {
     previewThead.innerHTML = '';
